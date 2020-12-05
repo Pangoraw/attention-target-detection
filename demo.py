@@ -16,13 +16,15 @@ from utils import imutils, evaluation
 from config import *
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--model_weights', type=str, help='model weights', default='model_demo.pt')
-parser.add_argument('--image_dir', type=str, help='images', default='data/demo/frames')
-parser.add_argument('--head', type=str, help='head bounding boxes', default='data/demo/person1.txt')
-parser.add_argument('--vis_mode', type=str, help='heatmap or arrow', default='heatmap')
-parser.add_argument('--out_threshold', type=int, help='out-of-frame target dicision threshold', default=100)
-args = parser.parse_args()
+def get_default_args():
+    """returns the default args for the demo"""
+    args = {}
+    args['model_weights'] = 'model_demo.pt'
+    args['image_dir'] = 'data/demo/frames'
+    args['head'] = 'data/demo/person1.txt'
+    args['vis_mode'] = 'heatmap'
+    args['out_threshold'] = 100
+    return args
 
 
 def _get_transform():
@@ -33,7 +35,7 @@ def _get_transform():
     return transforms.Compose(transform_list)
 
 
-def run():
+def run(args):
     column_names = ['frame', 'left', 'top', 'right', 'bottom']
     df = pd.read_csv(args.head, names=column_names, index_col=0)
     df['left'] -= (df['right']-df['left'])*0.1
@@ -87,7 +89,7 @@ def run():
             # vis
             plt.close()
             fig = plt.figure()
-            fig.canvas.manager.window.move(0,0)
+            # fig.canvas.manager.window.move(0,0)
             plt.axis('off')
             plt.imshow(frame_raw)
 
@@ -104,12 +106,12 @@ def run():
                     plt.plot((norm_p[0]*width,(head_box[0]+head_box[2])/2), (norm_p[1]*height,(head_box[1]+head_box[3])/2), '-', color=(0,1,0,1))
             else:
                 plt.imshow(norm_map, cmap = 'jet', alpha=0.2, vmin=0, vmax=255)
+                plt.show(block=False)
 
             plt.show(block=False)
-            plt.pause(0.2)
 
         print('DONE!')
 
 
 if __name__ == "__main__":
-    run()
+    run(get_default_args())

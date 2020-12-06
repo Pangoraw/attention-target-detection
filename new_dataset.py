@@ -15,11 +15,13 @@ import torch
 from PIL import Image
 import requests
 
+from frame_processor import FrameProcessor
+
 
 class MTCNNFaceDetector():
     def __init__(self):
         device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        self.model = MTCNN(margin=20, select_largest=True, device=device)
+        self.model = MTCNN(margin=50, select_largest=True, device=device)
         print(f">> Loaded MTCNN on {self.model.device}")
 
     def detect_faces(self, frame):
@@ -51,7 +53,7 @@ class CVFaceDetector():
         return self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
 
-def match_faces_bodies(frame, boxes, detector, draw_boxes=False):
+def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False):
     """Matches faces with the bodies for the given frame"""
     canvas = frame.copy()
     df_faces = []
@@ -68,6 +70,10 @@ def match_faces_bodies(frame, boxes, detector, draw_boxes=False):
                             (0, 255, 0), 
                             3
                     )
+                canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+                canvas = processor.process_frame(canvas, (
+                    int(box.x) + x, int(box.y) + y, w, h))
+                canvas = cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
                 df_faces.append({
                     'frame_id': int(box.abs_frame_id),
                     'box_id': int(box.box_id),
@@ -171,6 +177,7 @@ def main():
     DETECTION = args.detection
 
 
+    processor = FrameProcessor()
     if DETECTION == "cv2":
         detector = CVFaceDetector()
     elif DETECTION == "cnn":
@@ -193,6 +200,7 @@ def main():
         new_frame = match_faces_bodies(
                 frame,
                 df[df.abs_frame_id == i],
+                processor=processor,
                 detector=detector,
                 draw_boxes=DRAW_BOXES
         )

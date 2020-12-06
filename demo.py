@@ -22,7 +22,7 @@ def get_default_args():
     args['model_weights'] = 'model_demo.pt'
     args['image_dir'] = 'data/demo/frames'
     args['head'] = 'data/demo/person1.txt'
-    args['vis_mode'] = 'heatmap'
+    args['vis_mode'] = 'arrow'
     args['out_threshold'] = 100
     return args
 
@@ -36,6 +36,8 @@ def _get_transform():
 
 
 def run(args):
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+   
     column_names = ['frame', 'left', 'top', 'right', 'bottom']
     df = pd.read_csv(args.head, names=column_names, index_col=0)
     df['left'] -= (df['right']-df['left'])*0.1
@@ -48,12 +50,12 @@ def run(args):
 
     model = ModelSpatial()
     model_dict = model.state_dict()
-    pretrained_dict = torch.load(args.model_weights)
+    pretrained_dict = torch.load(args.model_weights, map_location=device)
     pretrained_dict = pretrained_dict['model']
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
 
-    model.cuda()
+    model.to(device)
     model.train(False)
 
     with torch.no_grad():
@@ -68,12 +70,13 @@ def run(args):
 
             head = test_transforms(head) # transform inputs
             frame = test_transforms(frame_raw)
+            print(">> head", head_box)
             head_channel = imutils.get_head_box_channel(head_box[0], head_box[1], head_box[2], head_box[3], width, height,
                                                         resolution=input_resolution).unsqueeze(0)
 
-            head = head.unsqueeze(0).cuda()
-            frame = frame.unsqueeze(0).cuda()
-            head_channel = head_channel.unsqueeze(0).cuda()
+            head = head.unsqueeze(0).to(device)
+            frame = frame.unsqueeze(0).to(device)
+            head_channel = head_channel.unsqueeze(0).to(device)
 
             # forward pass
             raw_hm, _, inout = model(frame, head_channel, head)
@@ -87,7 +90,7 @@ def run(args):
             norm_map = imresize(raw_hm, (height, width)) - inout
 
             # vis
-            plt.close()
+            # plt.close()
             fig = plt.figure()
             # fig.canvas.manager.window.move(0,0)
             plt.axis('off')
@@ -104,14 +107,17 @@ def run(args):
                     circ = patches.Circle((norm_p[0]*width, norm_p[1]*height), height/50.0, facecolor=(0,1,0), edgecolor='none')
                     ax.add_patch(circ)
                     plt.plot((norm_p[0]*width,(head_box[0]+head_box[2])/2), (norm_p[1]*height,(head_box[1]+head_box[3])/2), '-', color=(0,1,0,1))
+                    plt.show()
             else:
                 plt.imshow(norm_map, cmap = 'jet', alpha=0.2, vmin=0, vmax=255)
                 plt.show(block=False)
 
-            plt.show(block=False)
+            plt.show(block=True)
 
         print('DONE!')
 
 
 if __name__ == "__main__":
-    run(get_default_args())
+    args = get_default_args()
+    args = type('D', (object,), args)()
+    run(args)

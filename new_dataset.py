@@ -11,13 +11,15 @@ import numpy as np
 import pandas as pd
 import cv2
 from facenet_pytorch import MTCNN
+import torch
 from PIL import Image
 import requests
 
 
 class MTCNNFaceDetector():
     def __init__(self):
-        self.model = MTCNN(margin=20, select_largest=True)
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.model = MTCNN(margin=20, select_largest=True, device=device)
         print(f">> Loaded MTCNN on {self.model.device}")
 
     def detect_faces(self, frame):

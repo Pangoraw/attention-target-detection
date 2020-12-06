@@ -12,6 +12,7 @@ import pandas as pd
 import cv2
 from facenet_pytorch import MTCNN
 from PIL import Image
+import requests
 
 
 class MTCNNFaceDetector():
@@ -34,7 +35,13 @@ class MTCNNFaceDetector():
 
 class CVFaceDetector():
     def __init__(self):
-        self.face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+        cascade_file = "haarcascade_frontalface_default.xml"
+        if not os.path.isfile(cascade_file):
+            req = requests.get("https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml")
+            req.raise_for_status()
+            with open(cascade_file, "w") as f:
+                f.write(req.text)
+        self.face_cascade = cv2.CascadeClassifier(cascade_file)
 
     def detect_faces(self, frame):
         """Returns faces bounding boxes"""

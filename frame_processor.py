@@ -35,9 +35,15 @@ class FrameProcessor:
         self.vis_mode = vis_mode
         self.out_threshold = out_threshold
 
-    def process_frame(self, frame_raw, box):
+    def process_frame(self, frame_raw, box, canvas=None):
         if isinstance(frame_raw, np.ndarray):
             frame_raw = Image.fromarray(frame_raw)
+
+        if canvas is None:
+            canvas = frame_raw
+        elif isinstance(canvas, np.ndarray):
+            canvas = Image.fromarray(canvas)
+
         frame_raw = frame_raw.convert('RGB')
         width, height = frame_raw.size
 
@@ -74,7 +80,7 @@ class FrameProcessor:
                     pred_x, pred_y = evaluation.argmax_pts(raw_hm)
                     norm_p = [pred_x/output_resolution, pred_y/output_resolution]
 
-                    draw = ImageDraw.Draw(frame_raw)
+                    draw = ImageDraw.Draw(canvas)
                     draw.rectangle([
                         (box[0], box[1]),
                         (box[0] + box[2], box[1] + box[3])
@@ -91,4 +97,4 @@ class FrameProcessor:
             else:
                 raise Exception(f"vis_mode {self.vis_mode} is not supported")
 
-            return frame_raw
+            return canvas

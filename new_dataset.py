@@ -53,6 +53,16 @@ class CVFaceDetector():
         return self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
 
+def output_video_file(output_file, frames):
+    """Saves the frames into a video file"""
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    w, h = frames[0].shape[:2]
+    out = cv2.VideoWriter(output_file, fourcc, 25, (h, w))
+    for frame in frames:
+        out.write(frame)
+    out.release()
+
+
 def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False):
     """Matches faces with the bodies for the given frame"""
     canvas = frame.copy()
@@ -70,10 +80,12 @@ def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False)
                             (0, 255, 0), 
                             3
                     )
-                canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
-                canvas = processor.process_frame(canvas, (
-                    int(box.x) + x, int(box.y) + y, w, h))
-                canvas = cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
+                if processor is not None:
+                    canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+                    input_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    canvas = processor.process_frame(input_frame, 
+                        (int(box.x) + x, int(box.y) + y, w, h), canvas=canvas)
+                    canvas = cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
                 df_faces.append({
                     'frame_id': int(box.abs_frame_id),
                     'box_id': int(box.box_id),
@@ -101,9 +113,6 @@ def save_face_to_file(bboxes, files, face_id, output_folder):
 
 def save_video_to_files(frames, output_folder):
     """Saves the video to an output folder"""
-    if not os.path.isdir(output_folder):
-        print(f">> Creating folder {output_folder}")
-        os.makedirs(output_folder)
     print(">> Saving frames")
     for i, frame in tqdm(enumerate(frames), total=len(frames)):
         cv2.imwrite(os.path.join(output_folder, f"frame_{i}.png"), frame)
@@ -142,9 +151,9 @@ def parse_args():
     )
     parser.add_argument(
             "--detection",
-            default="cv2",
+            default="cnn",
             type=str,
-            help="which backend to use face detection (cv2/cnn) [default=cv2]",
+            help="which backend to use face detection (cv2/cnn) [default=cnn]",
     )
     parser.add_argument(
             "--video_file",
@@ -163,6 +172,17 @@ def parse_args():
             type=str,
             help="the location of the scores file [default=scores.csv]",
     )
+    parser.add_argument(
+            "--output_type",
+            default="video",
+            type=str,
+            help="the output type (video/frames) [default=video]",
+    )
+    parser.add_argument(
+            "--no_gaze_estimation",
+            action="store_true",
+            help="disable gaze estimation",
+    )
     return parser.parse_args()
 
 
@@ -175,9 +195,14 @@ def main():
     DRAW_BOXES = args.draw_boxes
     SCORES_FILE = args.scores_file
     DETECTION = args.detection
+    GAZE_ESTIMATION = not args.no_gaze_estimation
+    OUTPUT_TYPE = args.output_type
 
+    if GAZE_ESTIMATION:
+        processor = FrameProcessor()
+    else:
+        processor = None
 
-    processor = FrameProcessor()
     if DETECTION == "cv2":
         detector = CVFaceDetector()
     elif DETECTION == "cnn":
@@ -206,17 +231,24 @@ def main():
         )
         frames[i], new_df_faces = new_frame
         df_faces += new_df_faces
-    save_video_to_files(frames, os.path.join(FOLDER, "frames"))
 
-    df_faces = pd.DataFrame(df_faces)
+    if not os.path.isdir(FOLDER):
+        print(f">> Creating folder {FOLDER}")
+        os.makedirs(FOLDER)
+    if OUTPUT_TYPE == "frames":
+        save_video_to_files(frames, os.path.join(FOLDER, "frames"))
+        df_faces = pd.DataFrame(df_faces)
 
-    print(">> Saving box files")
-    box_ids = df_faces.box_id.unique()
-    for box_id in tqdm(box_ids, total=len(box_ids)):
-        with open(os.path.join(FOLDER, f"person{box_id}.txt"), "w") as f:
-            for _, frame in df_faces[df_faces.box_id == box_id].iterrows():
-                bbox = str([frame.x, frame.y, frame.x2, frame.y2]).replace(" ", "").strip("[]")
-                f.write(f"frame_{frame.frame_id}.png,{bbox}\n")
+        print(">> Saving box files")
+        box_ids = df_faces.box_id.unique()
+        for box_id in tqdm(box_ids, total=len(box_ids)):
+            with open(os.path.join(FOLDER, f"person{box_id}.txt"), "w") as f:
+                for _, frame in df_faces[df_faces.box_id == box_id].iterrows():
+                    bbox = str([frame.x, frame.y, frame.x2, frame.y2]).replace(" ", "").strip("[]")
+                    f.write(f"frame_{frame.frame_id}.png,{bbox}\n")
+    else:
+        output_video_file(os.path.join(FOLDER, "video.mp4"), frames)
+
 
 
 if __name__ == "__main__":

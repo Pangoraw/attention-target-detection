@@ -1,3 +1,8 @@
+### :book: Modifications for this fork
+
+ - Demo is usable on the cpu
+ - Added a script to input a video and a file with bounding boxes precomputed using [our modified slowfast](https://github.com/bdebbabi/slowfast)
+
 # CVPR 2020 - Detecting Attended Visual Targets in Video
 ![](misc/teaser.gif)
 

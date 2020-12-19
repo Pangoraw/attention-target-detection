@@ -70,7 +70,6 @@ def run(args):
 
             head = test_transforms(head) # transform inputs
             frame = test_transforms(frame_raw)
-            print(">> head", head_box)
             head_channel = imutils.get_head_box_channel(head_box[0], head_box[1], head_box[2], head_box[3], width, height,
                                                         resolution=input_resolution).unsqueeze(0)
 

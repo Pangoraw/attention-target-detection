@@ -11,12 +11,15 @@ from demo import _get_transform
 
 
 class FrameProcessor:
+    """
+    Processes frames with the Attention Target Detection model and draws
+    gaze estimation on the frame
+    """
     def __init__(self, model_weights='model_demo.pt', vis_mode='arrow', out_threshold=100):
         """
         Wrapper around ModelSpatial
         """
-        # TODO: investigate spatio temporal model
-        # and batch consequent frames
+        # TODO: investigate spatio temporal model and batch consequent frames
         self.model = ModelSpatial()
 
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -36,6 +39,17 @@ class FrameProcessor:
         self.out_threshold = out_threshold
 
     def process_frame(self, frame_raw, box, canvas=None):
+        """
+        Takes a frame and draws gaze estimation
+        Parameters
+        ==========
+            frame_raw: (np.ndarray) - an image from opencv
+            box: (tuple[Int]) - a TLBR bounding box
+            canvas: (np.ndarray) - an image to draw to instead of frame
+        Returns
+        =======
+            canvas: (np.ndarray) - the modified frame/canvas
+        """
         if isinstance(frame_raw, np.ndarray):
             frame_raw = Image.fromarray(frame_raw)
 
@@ -83,13 +97,13 @@ class FrameProcessor:
                     draw = ImageDraw.Draw(canvas)
                     draw.rectangle([
                         (box[0], box[1]),
-                        (box[0] + box[2], box[1] + box[3])
+                        (box[2], box[3])
                     ], outline="green", width=3)
                     heatmap_center = (norm_p[0] * width, norm_p[1] * height)
                     draw.line([
                         heatmap_center,
-                        (box[0] + box[2] / 2, box[1] + box[3] / 2)
-                    ], fill="green")
+                        (box[0] + (box[2] - box[0]) // 2, box[1] + (box[3] - box[1]) // 2)
+                    ], fill="green", width=3)
                     draw.ellipse([
                         (heatmap_center[0] - 10, heatmap_center[1] - 10),
                         (heatmap_center[0] + 10, heatmap_center[1] + 10)

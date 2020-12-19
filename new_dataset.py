@@ -80,19 +80,22 @@ def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False)
                             (0, 255, 0), 
                             3
                     )
+                PAD = 20
+                ax, ay = int(box.x) + x - PAD, int(box.y) + y - PAD
+                ax2, ay2 = ax + w + PAD, ay + h + PAD
                 if processor is not None:
                     canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
                     input_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     canvas = processor.process_frame(input_frame, 
-                        (int(box.x) + x, int(box.y) + y, w, h), canvas=canvas)
+                        (ax, ay, ax2, ay2), canvas=canvas)
                     canvas = cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
                 df_faces.append({
                     'frame_id': int(box.abs_frame_id),
                     'box_id': int(box.box_id),
-                    'x': int(box.x) + x,
-                    'y': int(box.y) + y,
-                    'x2': int(box.x) + x + w,
-                    'y2': int(box.y) + y + h,
+                    'x': ax,
+                    'y': ay,
+                    'x2': ax2,
+                    'y2': ay2,
                 })
         if draw_boxes:
             canvas = cv2.rectangle(
@@ -183,6 +186,11 @@ def parse_args():
             action="store_true",
             help="disable gaze estimation",
     )
+    parser.add_argument(
+            "--no-scores",
+            action="store_true",
+            help="use whole frame instead of the score file",
+    )
     return parser.parse_args()
 
 
@@ -197,6 +205,7 @@ def main():
     DETECTION = args.detection
     GAZE_ESTIMATION = not args.no_gaze_estimation
     OUTPUT_TYPE = args.output_type
+    NO_SCORES = args.no_scores
 
     if GAZE_ESTIMATION:
         processor = FrameProcessor()
@@ -210,13 +219,31 @@ def main():
     else:
         raise Exception(f"detection method {DETECTION} is invalid, expected one of [cv2, cnn]")
 
-    df = pd.read_csv(SCORES_FILE, header=None, index_col=None, names=[
-        "track_id", "frame_id", "box_id", "x", "y", "x2", "y2"] + list(range(80)))
-    df["abs_frame_id"] = df.frame_id + df.track_id - 128
     df_faces = []
+    if NO_SCORES:
+        print(f">> Reading frames from {VIDEO_FILE}")
+        frames = [
+            cv2.imread(os.path.join(VIDEO_FILE, frame_file))
+            for frame_file in os.listdir(VIDEO_FILE)
+        ]
+        h, w, _ = frames[0].shape
+        df = pd.DataFrame([{
+            'track_id': i // 128,
+            'frame_id': i,
+            'abs_frame_id': i,
+            'box_id': 0,
+            'x': 0,
+            'y': 0,
+            'x2': w,
+            'y2': h,
+        } for i in range(len(frames))])
+    else:
+        print(f">> Reading video from {VIDEO_FILE}")
+        df = pd.read_csv(SCORES_FILE, header=None, index_col=None, names=[
+            "track_id", "frame_id", "box_id", "x", "y", "x2", "y2"] + list(range(80)))
+        df["abs_frame_id"] = df.frame_id + df.track_id - 128
+        frames = collect_frames(VIDEO_FILE, FRAME_LIMIT)
 
-    print(f">> Reading video from {VIDEO_FILE}")
-    frames = collect_frames(VIDEO_FILE, FRAME_LIMIT)
 
     if os.path.isdir(FOLDER):
         shutil.rmtree(FOLDER)
@@ -236,6 +263,7 @@ def main():
         print(f">> Creating folder {FOLDER}")
         os.makedirs(FOLDER)
     if OUTPUT_TYPE == "frames":
+        os.makedirs(os.path.join(FOLDER, "frames"))
         save_video_to_files(frames, os.path.join(FOLDER, "frames"))
         df_faces = pd.DataFrame(df_faces)
 

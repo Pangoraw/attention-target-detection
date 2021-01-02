@@ -187,7 +187,7 @@ def parse_args():
             help="disable gaze estimation",
     )
     parser.add_argument(
-            "--no-scores",
+            "--no_scores",
             action="store_true",
             help="use whole frame instead of the score file",
     )

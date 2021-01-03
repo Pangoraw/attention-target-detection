@@ -37,7 +37,7 @@ def test():
     transform = _get_transform()
 
     # Prepare data
-    print("Loading Data")
+    print(f"Loading Data from {videoattentiontarget_val_data}")
     val_dataset = VideoAttTarget_video(videoattentiontarget_val_data, videoattentiontarget_val_label,
                                         transform=transform, test=True, seq_len_limit=50)
     val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
@@ -47,17 +47,17 @@ def test():
                                              collate_fn=video_pack_sequences)
 
     # Define device
-    device = torch.device('cuda', args.device)
+    device = torch.device('cuda', args.device) if torch.cuda.is_available() else torch.device('cpu')
 
     # Load model
     num_lstm_layers = 2
     print("Constructing model")
     model = ModelSpatioTemporal(num_lstm_layers = num_lstm_layers)
-    model.cuda(device)
+    model.to(device)
 
     print("Loading weights")
     model_dict = model.state_dict()
-    snapshot = torch.load(args.model_weights)
+    snapshot = torch.load(args.model_weights, map_location=device)
     snapshot = snapshot['model']
     model_dict.update(snapshot)
     model.load_state_dict(model_dict)
@@ -76,21 +76,21 @@ def test():
             Y_pad_data_heatmap, _ = pack_padded_sequence(gaze_heatmap_val, lengths_val, batch_first=True)
             Y_pad_data_inout, _ = pack_padded_sequence(inout_label_val, lengths_val, batch_first=True)
 
-            hx = (torch.zeros((num_lstm_layers, args.batch_size, 512, 7, 7)).cuda(device),
-                  torch.zeros((num_lstm_layers, args.batch_size, 512, 7, 7)).cuda(device)) # (num_layers, batch_size, feature dims)
+            hx = (torch.zeros((num_lstm_layers, args.batch_size, 512, 7, 7)).to(device),
+                  torch.zeros((num_lstm_layers, args.batch_size, 512, 7, 7)).to(device)) # (num_layers, batch_size, feature dims)
             last_index = 0
             previous_hx_size = args.batch_size
 
             for i in range(0, lengths_val[0], chunk_size):
-                X_pad_sizes_slice = X_pad_sizes[i:i + chunk_size].cuda(device)
+                X_pad_sizes_slice = X_pad_sizes[i:i + chunk_size].to(device)
                 curr_length = np.sum(X_pad_sizes_slice.cpu().detach().numpy())
                 # slice padded data
-                X_pad_data_slice_img = X_pad_data_img[last_index:last_index + curr_length].cuda(device)
-                X_pad_data_slice_head = X_pad_data_head[last_index:last_index + curr_length].cuda(device)
-                X_pad_data_slice_face = X_pad_data_face[last_index:last_index + curr_length].cuda(device)
-                Y_pad_data_slice_cont_gaze = Y_pad_data_cont_gaze[last_index:last_index + curr_length].cuda(device)
-                Y_pad_data_slice_heatmap = Y_pad_data_heatmap[last_index:last_index + curr_length].cuda(device)
-                Y_pad_data_slice_inout = Y_pad_data_inout[last_index:last_index + curr_length].cuda(device)
+                X_pad_data_slice_img = X_pad_data_img[last_index:last_index + curr_length].to(device)
+                X_pad_data_slice_head = X_pad_data_head[last_index:last_index + curr_length].to(device)
+                X_pad_data_slice_face = X_pad_data_face[last_index:last_index + curr_length].to(device)
+                Y_pad_data_slice_cont_gaze = Y_pad_data_cont_gaze[last_index:last_index + curr_length].to(device)
+                Y_pad_data_slice_heatmap = Y_pad_data_heatmap[last_index:last_index + curr_length].to(device)
+                Y_pad_data_slice_inout = Y_pad_data_inout[last_index:last_index + curr_length].to(device)
                 last_index += curr_length
 
                 # detach previous hidden states to stop gradient flow
@@ -139,11 +139,9 @@ def test():
 
     print("Summary ")
     print("\tAUC:{:.4f}"
-          "\tdist:{:.4f}"
-          "\tin vs out AP:{:.4f}".
-          format(torch.mean(torch.tensor(AUC)),
-                 torch.mean(torch.tensor(distance)),
-                 evaluation.ap(in_vs_out_groundtruth, in_vs_out_pred)))
+          "\tdist:{:.4f}",
+          torch.mean(torch.tensor(AUC)),
+          torch.mean(torch.tensor(distance)))# evaluation.ap(in_vs_out_groundtruth, in_vs_out_pred)))
 
 
 def video_pack_sequences(in_batch):

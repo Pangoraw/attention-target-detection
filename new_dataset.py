@@ -18,9 +18,11 @@ import requests
 from frame_processor import FrameProcessor
 
 
-class MTCNNFaceDetector():
+class MTCNNFaceDetector:
     def __init__(self):
-        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         self.model = MTCNN(margin=50, select_largest=True, device=device)
         print(f">> Loaded MTCNN on {self.model.device}")
 
@@ -37,11 +39,13 @@ class MTCNNFaceDetector():
             return []
 
 
-class CVFaceDetector():
+class CVFaceDetector:
     def __init__(self):
         cascade_file = "haarcascade_frontalface_default.xml"
         if not os.path.isfile(cascade_file):
-            req = requests.get("https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml")
+            req = requests.get(
+                "https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml"
+            )
             req.raise_for_status()
             with open(cascade_file, "w") as f:
                 f.write(req.text)
@@ -55,7 +59,7 @@ class CVFaceDetector():
 
 def output_video_file(output_file, frames):
     """Saves the frames into a video file"""
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     w, h = frames[0].shape[:2]
     out = cv2.VideoWriter(output_file, fourcc, 25, (h, w))
     for frame in frames:
@@ -68,17 +72,17 @@ def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False)
     canvas = frame.copy()
     df_faces = []
     for _, box in boxes.iterrows():
-        roi = frame[int(box.y):int(box.y2), int(box.x):int(box.x2)]
+        roi = frame[int(box.y) : int(box.y2), int(box.x) : int(box.x2)]
         if roi.size > 0:
             faces = detector.detect_faces(roi)
             for (x, y, w, h) in faces:
                 if draw_boxes:
                     canvas = cv2.rectangle(
-                            canvas,
-                            (int(box.x) + x, int(box.y) + y),
-                            (int(box.x) + x + w, int(box.y) + y + h),
-                            (0, 255, 0), 
-                            3
+                        canvas,
+                        (int(box.x) + x, int(box.y) + y),
+                        (int(box.x) + x + w, int(box.y) + y + h),
+                        (0, 255, 0),
+                        3,
                     )
                 PAD = 20
                 ax, ay = int(box.x) + x - PAD, int(box.y) + y - PAD
@@ -86,23 +90,26 @@ def match_faces_bodies(frame, boxes, detector, processor=None, draw_boxes=False)
                 if processor is not None:
                     canvas = cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
                     input_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    canvas = processor.process_frame(input_frame, 
-                        (ax, ay, ax2, ay2), canvas=canvas)
+                    canvas = processor.process_frame(
+                        input_frame, (ax, ay, ax2, ay2), canvas=canvas
+                    )
                     canvas = cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
-                df_faces.append({
-                    'frame_id': int(box.abs_frame_id),
-                    'box_id': int(box.box_id),
-                    'x': ax,
-                    'y': ay,
-                    'x2': ax2,
-                    'y2': ay2,
-                })
+                df_faces.append(
+                    {
+                        "frame_id": int(box.abs_frame_id),
+                        "box_id": int(box.box_id),
+                        "x": ax,
+                        "y": ay,
+                        "x2": ax2,
+                        "y2": ay2,
+                    }
+                )
         if draw_boxes:
             canvas = cv2.rectangle(
-                    canvas,
-                    (int(box["x"]), int(box["y"])),
-                    (int(box.x2), int(box.y2)),
-                    (255, 0, 0)
+                canvas,
+                (int(box["x"]), int(box["y"])),
+                (int(box.x2), int(box.y2)),
+                (255, 0, 0),
             )
     return canvas, df_faces
 
@@ -141,55 +148,65 @@ def parse_args():
     """Parses command line arguments"""
     parser = argparse.ArgumentParser(description="Generate a dataset from atd")
     parser.add_argument(
-            "--output_folder",
-            default="tmp_frames",
-            type=str,
-            help="the folder to output the dataset [default=tmp_frames]",
+        "--output_folder",
+        default="tmp_frames",
+        type=str,
+        help="the folder to output the dataset [default=tmp_frames]",
     )
     parser.add_argument(
-            "--frame_limit",
-            default=2**16,
-            type=int,
-            help="the number of frames to use [default=all]",
+        "--frame_limit",
+        default=2 ** 16,
+        type=int,
+        help="the number of frames to use [default=all]",
     )
     parser.add_argument(
-            "--detection",
-            default="cnn",
-            type=str,
-            help="which backend to use face detection (cv2/cnn) [default=cnn]",
+        "--detection",
+        default="cnn",
+        type=str,
+        help="which backend to use face detection (cv2/cnn) [default=cnn]",
     )
     parser.add_argument(
-            "--video_file",
-            default="ur.mp4",
-            type=str,
-            help="the video file to generate the dataset from [default=ur.mp4]",
+        "--video_file",
+        default="ur.mp4",
+        type=str,
+        help="the video file to generate the dataset from [default=ur.mp4]",
     )
     parser.add_argument(
-            "--draw_boxes",
-            action="store_true",
-            help="whether or not to draw boxes on the frames",
+        "--draw_boxes",
+        action="store_true",
+        help="whether or not to draw boxes on the frames",
     )
     parser.add_argument(
-            "--scores_file",
-            default="scores.csv",
-            type=str,
-            help="the location of the scores file [default=scores.csv]",
+        "--scores_file",
+        default="scores.csv",
+        type=str,
+        help="the location of the scores file [default=scores.csv]",
     )
     parser.add_argument(
-            "--output_type",
-            default="video",
-            type=str,
-            help="the output type (video/frames) [default=video]",
+        "--output_type",
+        default="video",
+        type=str,
+        help="the output type (video/frames) [default=video]",
     )
     parser.add_argument(
-            "--no_gaze_estimation",
-            action="store_true",
-            help="disable gaze estimation",
+        "--no_gaze_estimation",
+        action="store_true",
+        help="disable gaze estimation",
     )
     parser.add_argument(
-            "--no_scores",
-            action="store_true",
-            help="use whole frame instead of the score file",
+        "--no_scores",
+        action="store_true",
+        help="use whole frame instead of the score file",
+    )
+    parser.add_argument(
+        "--frame_processing_mode",
+        default="spatial",
+        help="attention target detection architecture to use [default=spatial]",
+    )
+    parser.add_argument(
+        "--frame_processing_weights",
+        default="model_demo.pt",
+        help="where to load the weights from [default=model_demo.pt]",
     )
     return parser.parse_args()
 
@@ -206,9 +223,13 @@ def main():
     GAZE_ESTIMATION = not args.no_gaze_estimation
     OUTPUT_TYPE = args.output_type
     NO_SCORES = args.no_scores
+    FRAME_PROCESSING_MODE = args.frame_processing_mode
+    FRAME_PROCESSING_WEIGHTS = args.frame_processing_weights
 
     if GAZE_ESTIMATION:
-        processor = FrameProcessor()
+        processor = FrameProcessor(
+            mode=FRAME_PROCESSING_MODE, model_weights=FRAME_PROCESSING_WEIGHTS
+        )
     else:
         processor = None
 
@@ -217,7 +238,9 @@ def main():
     elif DETECTION == "cnn":
         detector = MTCNNFaceDetector()
     else:
-        raise Exception(f"detection method {DETECTION} is invalid, expected one of [cv2, cnn]")
+        raise Exception(
+            f"detection method {DETECTION} is invalid, expected one of [cv2, cnn]"
+        )
 
     df_faces = []
     if NO_SCORES:
@@ -227,34 +250,43 @@ def main():
             for frame_file in os.listdir(VIDEO_FILE)
         ]
         h, w, _ = frames[0].shape
-        df = pd.DataFrame([{
-            'track_id': i // 128,
-            'frame_id': i,
-            'abs_frame_id': i,
-            'box_id': 0,
-            'x': 0,
-            'y': 0,
-            'x2': w,
-            'y2': h,
-        } for i in range(len(frames))])
+        df = pd.DataFrame(
+            [
+                {
+                    "track_id": i // 128,
+                    "frame_id": i,
+                    "abs_frame_id": i,
+                    "box_id": 0,
+                    "x": 0,
+                    "y": 0,
+                    "x2": w,
+                    "y2": h,
+                }
+                for i in range(len(frames))
+            ]
+        )
     else:
         print(f">> Reading video from {VIDEO_FILE}")
-        df = pd.read_csv(SCORES_FILE, header=None, index_col=None, names=[
-            "track_id", "frame_id", "box_id", "x", "y", "x2", "y2"] + list(range(80)))
+        df = pd.read_csv(
+            SCORES_FILE,
+            header=None,
+            index_col=None,
+            names=["track_id", "frame_id", "box_id", "x", "y", "x2", "y2"]
+            + list(range(80)),
+        )
         df["abs_frame_id"] = df.frame_id + df.track_id - 128
         frames = collect_frames(VIDEO_FILE, FRAME_LIMIT)
-
 
     if os.path.isdir(FOLDER):
         shutil.rmtree(FOLDER)
     print(">> Matching frames")
     for i, frame in tqdm(enumerate(frames), total=len(frames)):
         new_frame = match_faces_bodies(
-                frame,
-                df[df.abs_frame_id == i],
-                processor=processor,
-                detector=detector,
-                draw_boxes=DRAW_BOXES
+            frame,
+            df[df.abs_frame_id == i],
+            processor=processor,
+            detector=detector,
+            draw_boxes=DRAW_BOXES,
         )
         frames[i], new_df_faces = new_frame
         df_faces += new_df_faces
@@ -272,13 +304,15 @@ def main():
         for box_id in tqdm(box_ids, total=len(box_ids)):
             with open(os.path.join(FOLDER, f"person{box_id}.txt"), "w") as f:
                 for _, frame in df_faces[df_faces.box_id == box_id].iterrows():
-                    bbox = str([frame.x, frame.y, frame.x2, frame.y2]).replace(" ", "").strip("[]")
+                    bbox = (
+                        str([frame.x, frame.y, frame.x2, frame.y2])
+                        .replace(" ", "")
+                        .strip("[]")
+                    )
                     f.write(f"frame_{frame.frame_id}.png,{bbox}\n")
     else:
         output_video_file(os.path.join(FOLDER, "video.mp4"), frames)
 
 
-
 if __name__ == "__main__":
     main()
-
